@@ -1,6 +1,0 @@
-apiVersion: snapshot.storage.k8s.io/v1
-kind: VolumeSnapshotClass
-metadata:
-  name: fsx-snapclass
-driver: csi.trident.netapp.io
-deletionPolicy: Delete

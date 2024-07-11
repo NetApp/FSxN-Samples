@@ -1,8 +1,0 @@
-apiVersion: trident.netapp.io/v1
-kind: TridentVolumeReference
-metadata:
-  name: rpc-app-pvc
-  namespace: rpc
-spec:
-  pvcName: shared-pv
-  pvcNamespace: vector
