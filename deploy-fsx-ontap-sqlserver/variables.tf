@@ -296,3 +296,13 @@ variable "fsx_security_group_egress_config" {
     }
   ]
 }
+
+variable "sample_databasde_download_url" {
+  description = "Sample DB Download URL"
+  type        = string
+}
+
+variable "sevenzip_download_url" {
+  description = "7zip Download URL"
+  type        = string
+}

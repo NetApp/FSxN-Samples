@@ -100,3 +100,13 @@ variable "admin_password" {
   description = "The password for the Administrator user"
   type        = string
 }
+
+variable "sample_databasde_download_url" {
+  description = "Sample DB Download URL"
+  type        = string
+}
+
+variable "sevenzip_download_url" {
+  description = "7zip Download URL"
+  type        = string
+}

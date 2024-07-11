@@ -49,20 +49,22 @@ This repository is meant for deployment of SQL Server on EC2 with FSxN. The foll
 
 ### Inputs
 
-| Name                  | Description                                                                                                   | Type           | Default                              | Required |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------ | :------: |
-| creator_tag           | Creator Tag assigned for all the resources created                                                            | `string`       |                                      |   Yes    |
-| environment           | Name of the environment (demo, test, qa etc.)                                                                 | `string`       | `Demo`                               |    No    |
-| aws_location          | AWS region                                                                                                    | `string`       | `ap-southeast-1`                     |   Yes    |
-| availability_zones    | Availability Zones corresponding to the regions                                                               | `list(string)` | `"ap-southeast-1", "ap-southeast-2"` |   Yes    |
-| ec2_instance_type     | SQL Server EC2 instance type                                                                                  | `string`       | `t3.2xlarge`                         |   Yes    |
-| ec2_instance_keypair  | EC2 Key Pair to be assigned for the deployed EC2 instance                                                     | `string`       |                                      |   Yes    |
-| ec2_iam_role          | IAM Role assigned to the EC2 (see section)[#create-an-iam-role-and-attach-the-policy-amazonssmreadonlyaccess] | `string`       |                                      |   Yes    |
-| fsxn_password         | Password for the fsxadmin user assigned to the filesystem                                                     | `string`       |                                      |   Yes    |
-| volume_security_style | Root Volume and Flex Volume Security Style                                                                    | `string`       | `NTFS`                               |   Yes    |
-| vpc_cidr              | CIDR Range for the VPC to be created                                                                          | `string`       | `10.0.0.0/16`                        |   Yes    |
-| public_subnets_cidr   | 2 x Public Subnets to be created in the VPC                                                                   | `list(string)` | `"10.0.0.0/20", "10.0.16.0/20"`      |   Yes    |
-| private_subnets_cidr  | 2 x Private Subnets to be created in the VPC                                                                  | `list(string)` | `"10.0.128.0/20", "10.0.144.0/20"`   |   Yes    |
+| Name                          | Description                                                                                                   | Type           | Default                              | Required |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------- | ------------------------------------ | :------: |
+| creator_tag                   | Creator Tag assigned for all the resources created                                                            | `string`       |                                      |   Yes    |
+| environment                   | Name of the environment (demo, test, qa etc.)                                                                 | `string`       | `Demo`                               |    No    |
+| aws_location                  | AWS region                                                                                                    | `string`       | `ap-southeast-1`                     |   Yes    |
+| availability_zones            | Availability Zones corresponding to the regions                                                               | `list(string)` | `"ap-southeast-1", "ap-southeast-2"` |   Yes    |
+| ec2_instance_type             | SQL Server EC2 instance type                                                                                  | `string`       | `t3.2xlarge`                         |   Yes    |
+| ec2_instance_keypair          | EC2 Key Pair to be assigned for the deployed EC2 instance                                                     | `string`       |                                      |   Yes    |
+| ec2_iam_role                  | IAM Role assigned to the EC2 (see section)[#create-an-iam-role-and-attach-the-policy-amazonssmreadonlyaccess] | `string`       |                                      |   Yes    |
+| fsxn_password                 | Password for the fsxadmin user assigned to the filesystem                                                     | `string`       |                                      |   Yes    |
+| volume_security_style         | Root Volume and Flex Volume Security Style                                                                    | `string`       | `NTFS`                               |   Yes    |
+| vpc_cidr                      | CIDR Range for the VPC to be created                                                                          | `string`       | `10.0.0.0/16`                        |   Yes    |
+| public_subnets_cidr           | 2 x Public Subnets to be created in the VPC                                                                   | `list(string)` | `"10.0.0.0/20", "10.0.16.0/20"`      |   Yes    |
+| private_subnets_cidr          | 2 x Private Subnets to be created in the VPC                                                                  | `list(string)` | `"10.0.128.0/20", "10.0.144.0/20"`   |   Yes    |
+| sevenzip_download_url         | Download URL for 7zip exe installation                                                                        | 'string'       | No                                   |   Yes    |
+| sample_databasde_download_url | Download URL for Sample Database (compressed using 7zip)                                                      | 'string'       | No                                   |   Yes    |
 
 ### Outputs
 
@@ -286,6 +288,8 @@ You can see that Terraform recognizes the modules required by our configuration:
     vpc_cidr              = "10.0.0.0/16"
     public_subnets_cidr   = ["10.0.0.0/20", "10.0.16.0/20"]
     private_subnets_cidr  = ["10.0.128.0/20", "10.0.144.0/20"]
+    sevenzip_download_url = "<7zip exe download url>"
+    sample_databasde_download_url = "<Sample Database Download URL>"
   ```
 
 > [!IMPORTANT] > **Make sure to replace the values with ones that match your AWS environment and needs.**

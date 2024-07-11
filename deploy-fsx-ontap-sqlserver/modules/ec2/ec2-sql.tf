@@ -41,11 +41,11 @@ module "sqlserver" {
             {
                 if(!(Test-Path -Path $DataDrive":\SO.7z")) {
                     Write-Host "Downloading Sample Database"
-                    Start-BitsTransfer -Source "https://downloads.brentozar.com/StackOverflow2013_201809117.7z" -Destination $DataDrive":\SO.7z" -Confirm:$false -ErrorAction SilentlyContinue
+                    Start-BitsTransfer -Source "${var.sample_databasde_download_url}" -Destination $DataDrive":\SO.7z" -Confirm:$false -ErrorAction SilentlyContinue
                     try {
                         if(!(Test-Path -Path "C:\Program Files\7-zip\7z.exe")) {
                             Write-Host "Downloading 7zip"
-                            $dlurl = 'https://7-zip.org/' + (Invoke-WebRequest -UseBasicParsing -Uri 'https://7-zip.org/' | Select-Object -ExpandProperty Links | Where-Object {($_.outerHTML -match 'Download')-and ($_.href -like "a/*") -and ($_.href -like "*-x64.exe")} | Select-Object -First 1 | Select-Object -ExpandProperty href)
+                            $dlurl = "${var.sevenzip_download_url}"
                             $installerPath = Join-Path $DataDrive":\" (Split-Path $dlurl -Leaf)
                             Invoke-WebRequest $dlurl -OutFile $installerPath
                             Start-Process -FilePath $installerPath -Args "/S" -Verb RunAs -Wait

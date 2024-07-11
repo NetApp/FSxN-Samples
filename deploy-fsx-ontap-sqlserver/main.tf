@@ -65,9 +65,11 @@ module "sqlserver" {
   fsxn_sql_data_volume = module.fsxontap.fsx_sql_data_volume
   fsxn_sql_log_volume  = module.fsxontap.fsx_sql_log_volume
 
-  sql_data_volume_drive_letter = "D"
-  sql_log_volume_drive_letter  = "E"
-  sql_install_sample_database  = true
+  sql_data_volume_drive_letter  = "D"
+  sql_log_volume_drive_letter   = "E"
+  sql_install_sample_database   = true
+  sevenzip_download_url         = var.sevenzip_download_url
+  sample_databasde_download_url = var.sample_databasde_download_url
 
   creator_tag = var.creator_tag
   depends_on  = [module.fsxontap]
