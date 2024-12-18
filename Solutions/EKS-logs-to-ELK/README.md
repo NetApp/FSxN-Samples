@@ -19,8 +19,9 @@ The following section provide quick start instructions for multiple logs shipper
 
 ### Prerequisites
 
-* `Helm` - for resource installation.
-* `Kubectl` – for interacting with the EKS cluster.
+* `helm` - For resource installation. Documenation [here](https://helm.sh/docs/).
+* `kubectl` – For interacting with the EKS cluster. Documentation [here](https://kubernetes.io/docs/reference/kubectl/).
+* An AWS EKS cluster.
 * NetApp FSxN running on the same EKS VPC.
 * TCP NFS ports should be open between the EKS nodes and the FSxN: 
     `111`,
@@ -35,19 +36,17 @@ The following section provide quick start instructions for multiple logs shipper
 
 ### Installation
 
-* Configure Trident CSI backend to connect to the FSxN file system. Create the backend configuration for the trident driver. Create secret on trident namespace and fill the FSxN password:
-
+* Configure Trident CSI backend to connect to the FSxN file system. First step is to configure a secret for Trident to use to communciate with the FSxN file system.
 ```
 kubectl create secret generic fsx-secret --from-literal=username=fsxadmin --from-literal=password=<your FSxN password> -n trident
 ```
-
-* Install trident-resources helm chart from this GitHub repository.
-  The custom Helm chart includes:
+Next, create a backend configuration for Trident to use to connect to the FSxN file system by running the included helm chart.
+* The custom Helm chart includes:
    - `backend-tbc-ontap-nas.yaml` - backend configuration for using NFS on EKS
    - `backend-fsx-ontap-san.yaml` - backend configuration for using ISCSI on EKS (Optional)
    - `storageclass-fsx-nfs.yaml` - Kubernetes storage class for using NFS 
    - `storageclass-fsx-san.yaml` - Kubernetes storage class for using ISCSI (Optional) 
-   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. **NOTE:** The PVC will be created in the `vector` namespace, so if it does not exist, it should be created before. [Check Trident TridentVolumeReference](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
+   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. **NOTE:** The PVC will be created in the `vector` namespace, so if this namespace does not exist, it should be created before running the helm command below. [Check Trident TridentVolumeReference](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
 
 The following variables should be filled on the `trident-resources/values.yaml`, or set via the `--set` Helm command line option.
 
@@ -55,14 +54,14 @@ The following variables should be filled on the `trident-resources/values.yaml`,
 * `fsx.managment_lif` - FSxN management ip address
 * `fsx.svm_name` - FSxN SVM name
 * `fsx.data_lif` - FSxN SVM data ip address
-* `configuration.storageclass_nas` - NAS storage class name
+* `configuration.storageclass_nas` - NAS storage class name. If you change this, you will need to update the sample application as well.
 * `configuration.storageclass_san` - SAN (ISCSI) storage class name
 
 Then use helm to deploy the package:
 ```
 helm install trident-resources ./trident-resources -n trident
 ```
-:bulb: **NOTE:** If this command fails (e.g. because you hadn't created the `vector` namespace first), it still creates a secret under the 'trident' namespace that must deleted before re-running the command. You might see an `cannot re-use a name that is still in use` error when trying to re-run it. Use 'kubectl get secrets -n trident' to get the name of the secret, it will look something like `sh.helm.release.v1.trident-resources.v1` and delete it using 'kubectl delete secret <secret-name> -n trident'.
+:bulb: **NOTE:** If this command fails (e.g. because you hadn't created the `vector` namespace first), it still creates a secret under the 'trident' namespace that must deleted before re-running the command. You might see an "cannot re-use a name that is still in use" error when trying to re-run it. Use `kubectl get secrets -n trident` to get the name of the secret, it will look something like `sh.helm.release.v1.trident-resources.v1` and delete it using `kubectl delete secret <secret-name> -n trident`.
 
 Verify that FSxN has been successfully connected to the backend:
 ```
@@ -144,15 +143,13 @@ spec:
             subPathExpr: $(NODE_NAME)/$(POD_NAME)
             name: task-pv-storage
 ```
-* Mount FSxN Trident volume to the sample application
+* This mounts FSxN Trident volume to the sample application.
 * Adding `POD_NAME`, `NODE_NAME` as environment variables for using `Kubernetes subPathExpr`. In this example, a Pod uses subPathExpr to create a directory `/<current-running-node-name>/<pod-name>` within the mountPath volume `/log`. The mountPath volume takes the Pod name and the Node name from the downwardAPI. The mount directory `/log/<node>/<pod>` is mounted at `/log` in the container and the container writes logs directly to `/log/<node>/<pod>` path. See [Kubernetes subPathExpr example](https://kubernetes.io/docs/concepts/storage/volumes/).
 
-Installing an example application by helm:
-
+Install the example application by running:
 ```
 helm upgrade --install example-app ./examples/example-app -n rpc --create-namespace
 ```
-
 To check that it was successfully deployed run:
 ```
 kubectl get pods -n rpc
@@ -169,7 +166,7 @@ When the application is deployed, you should be able to see the PVC as a mount a
 
 ### Collecting application logs with a logs collector
 
-Implementing an open-source log collectors to collect logs from the PVC and stream them to ElasticSearch, Loki, S3, etc.
+There are examples of setting up three different types of log collectors to collect logs from the PVC and stream them to the console. You can read more about each of the log collectors in the following sections.
 
 #### **vector.dev** 
 A lightweight, ultra-fast tool for building observability pipelines. Check [vector.dev documentation](https://vector.dev/)
@@ -181,8 +178,7 @@ git clone https://github.com/vectordotdev/helm-charts.git
 cd helm-charts/charts/vector
 ```
 
-2. Create a file to override the default values:
-**vector-override-values.yaml**:
+2. Create a file (**vector-override-values.yaml**) to override the default values:
 ```
 role: "Agent"
 
@@ -217,9 +213,7 @@ extraVolumes:
 * `existingConfigMaps` - Adding cutom ConfigMap shown below.
 * `extraVolumeMounts` - Mount primary PVC as `/logs/<currnet-node>`, a DaemonSet can only see pods logs on the same host.
 
-3. Create a ConfigMap for the Vector stack. This file needs to be put into the `templates` directory of the Vector chart.
-
-###### **vector-logs-cm.yaml**:
+3. Create a ConfigMap file (**vector-logs-cm.yaml**) for the Vector stack. This file needs to be put into the `templates` directory.
 ```
 apiVersion: v1
 kind: ConfigMap
@@ -250,9 +244,9 @@ data:
 In the example above, collecting logs from [source file](https://vector.dev/docs/reference/configuration/sources/file/) as /logs mount and stream it into the console.
 [See more vector Sink configuration](https://vector.dev/docs/reference/configuration/sinks/)
 
-4. Install Vector using override values:
+4. Install Vector using override values by running:
 ```
-helm install vector ./  -n vector -f agent-override-values.yaml
+helm install vector ./  -n vector -f vector-override-values.yaml
 ```
 
 #### **Filebeat** 
@@ -264,8 +258,7 @@ Install Filebeat as DaemonSet from Helm chart and configure:
 git clone https://github.com/elastic/helm-charts.git
 cd helm-charts/filebeat
 ```
-2. Adding override values:
-**filebeat-overide-values.yaml**:
+2. Create a file (**filebeat-overide-values.yaml**) to override the default values:
 ```
 daemonset:
   enabled: true
@@ -280,8 +273,7 @@ daemonset:
       persistentVolumeClaim:
         claimName: shared-pv
 ```
-3. Adding `/examples/logs-collectors/filebeat/filebeat-logs-config.yaml` into Filebeat stack:
-**filebeat-logs-config.yaml**:
+3. Create a ConfigMap file (**filebeat-logs-config.yaml**) and place in the templates directory:
 ```
 apiVersion: v1
 kind: ConfigMap
@@ -315,10 +307,7 @@ In the example above, collecting logs from [input Log](https://www.elastic.co/gu
 
 5. Install Filebeat using override values:
 ```
-helm install filebeat ./
-  --namespace vector \
-  --create-namespace \
-  -f filebeat-overide-values.yaml
+helm install filebeat ./ -n vector -f filebeat-overide-values.yaml
 ```
 
 #### **Fluent-bit** 
@@ -326,8 +315,7 @@ Fluent Bit is an open-source telemetry agent specifically designed to efficientl
 
 Install fluent-operator from [Helm chart](https://github.com/fluent/helm-charts/tree/main/charts/fluent-operator) and configure:
 
-1. Adding `examples/logs-collectors/fluent-bit/fluentbit-override-values.yaml` override values:
-**fluentbit-override-values.yaml:**
+1. Create an file (**fluentbit-override-values.yaml**) override values:
 ```
 fluentbit:
   enable: true
@@ -367,13 +355,13 @@ kubectl exec -it -n rpc POD_NAME -- /bin/bash
 # Run this inside the container:
 echo "this is my first log" >> /log/access.log
 ```
-You should see the log on vector stdout log:
+For **vector.dev** you should see:
 ```
 $ kubectl logs -n vector daemonset/vector | grep "this is"
 2024-01-21T11:45:31.903153Z  INFO source{component_kind="source" component_id=access_logs component_type=file}:file_server: vector::internal_events::file::source: Found new file to watch. file=/logs/eks-sample-linux-deployment-858b788c8-57gsz/access.log
 this is my first log
 ```
-You should see the log on filebeat stdout log:
+For **filebeat** you should see:
 ```
 "log": {
     "offset": 0,
@@ -386,7 +374,7 @@ You should see the log on filebeat stdout log:
     "type": "log"
 }
 ```
-You should see the log on fluent-bit stdout log:
+for **Fluent-bit** you should see:
 ```
 $ kubectl logs daemonset/fluent-bit -n vector | grep "this is"
 kube.logs.eks-sample-linux-deployment-858b788c8-mrl6l.access.log: [[1705914980.701605366, {}], {"log"=>"this is my first log"}]
