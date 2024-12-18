@@ -31,14 +31,14 @@ The following section provide quick start instructions for multiple logs shipper
     `4049` - [Check NetAppKB instructions](https://kb.netapp.com/onprem/ontap/da/NAS/Which_Network_File_System_NFS_TCP_and_NFS_UDP_ports_are_used_on_the_storage_system)
 * Kubernetes Snapshot Custom Resources (CRD) and Snapshot Controller installed on EKS cluster:
   Learn more about the snapshot requirements for your cluster in the ["How to Deploy Volume Snapshots”](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/#how-to-deploy-volume-snapshots) Kubernetes blog.
-* NetApp Trident operator CSI should be installed on EKS. [Check Trident installation guide using Helm](https://docs.netapp.com/us-en/trident/trident-get-started/kubernetes-deploy-helm.html#deploy-the-trident-operator-and-install-astra-trident-using-helm).
+* NetApp Trident operator CSI should be installed on EKS. [Check Trident installation guide using Helm](https://docs.netapp.com/us-en/trident/trident-use/trident-fsx-install-trident.html)
 
 ### Installation
 
 * Configure Trident CSI backend to connect to the FSxN file system. Create the backend configuration for the trident driver. Create secret on trident namespace and fill the FSxN password:
 
 ```
-kubectl create secret generic fsx-secret --from-literal=username=fsxadmin --from-literal=password=<your FSxN password> -n trident --create-namespace
+kubectl create secret generic fsx-secret --from-literal=username=fsxadmin --from-literal=password=<your FSxN password> -n trident
 ```
 
 * Install trident-resources helm chart from this GitHub repository.
@@ -47,13 +47,14 @@ kubectl create secret generic fsx-secret --from-literal=username=fsxadmin --from
    - `backend-fsx-ontap-san.yaml` - backend configuration for using ISCSI on EKS (Optional)
    - `storageclass-fsx-nfs.yaml` - Kubernetes storage class for using NFS 
    - `storageclass-fsx-san.yaml` - Kubernetes storage class for using ISCSI (Optional) 
-   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. NOTE: The PVC will be created in the log-collector namespace, so if it does not exist, it should be created before. [Check Trident TridentVolumeReference](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
+   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. **NOTE:** The PVC will be created in the `vector` namespace, so if it does not exist, it should be created before. [Check Trident TridentVolumeReference](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
 
-The following variables should be filled on the Values.yaml or run the following by using `--set` Helm command.
+The following variables should be filled on the `trident-resources/values.yaml`, or set via the `--set` Helm command line option.
 
 * `namespace` - namespace of the Trident operator. Typically 'trident'.
-* `fsx.managment_lif` - FSxN ip address
+* `fsx.managment_lif` - FSxN management ip address
 * `fsx.svm_name` - FSxN SVM name
+* `fsx.data_lif` - FSxN SVM data ip address
 * `configuration.storageclass_nas` - NAS storage class name
 * `configuration.storageclass_san` - SAN (ISCSI) storage class name
 
@@ -61,15 +62,28 @@ Then use helm to deploy the package:
 ```
 helm install trident-resources ./trident-resources -n trident
 ```
+:bulb: **NOTE:** If this command fails (e.g. because you hadn't created the `vector` namespace first), it still creates a secret under the 'trident' namespace that must deleted before re-running the command. You might see an `cannot re-use a name that is still in use` error when trying to re-run it. Use 'kubectl get secrets -n trident' to get the name of the secret, it will look something like `sh.helm.release.v1.trident-resources.v1` and delete it using 'kubectl delete secret <secret-name> -n trident'.
 
 Verify that FSxN has been successfully connected to the backend:
 ```
 kubectl get TridentBackendConfig -n trident
 ```
+The output should look similar to this:
+```
+$ kubectl get tbc -n trident
+NAME                    BACKEND NAME            BACKEND UUID                           PHASE   STATUS
+backend-fsx-ontap-nas   backend-fsx-ontap-nas   a0195e9b-5e12-456d-a4b8-bd8d41ea4597   Bound   Success
+backend-fsx-ontap-san   backend-fsx-ontap-san   bf8f86b4-ff86-4f31-931d-4b5e619a55b1   Bound   Success
+```
+If the status is not `Success`, then use the following command to get more information:
+```
+kubectl describe tbc backend-fsx-ontap-nas -n trident
+```
 
 ### Implementing a sample application for collecting logs
 
 Here is an example of an application that mounts Trident PVC at /log and uses it for cross-namespace PVC.
+The yaml files mentioned below are located in the `examples/example-app/templates` directory.
 
 ##### **shared-pvc.yaml**:
 ```
@@ -88,8 +102,10 @@ spec:
       storage: 100Gi
   storageClassName: trident-csi
 ```
+Where:
 * `trident.netapp.io/shareFromPVC:` The primary PersistentVolumeClaim you have created previously.
 * `storage` - volume size
+* `storageClassName` - storage class name you set in the `trident-resources/values.yaml` file.
 
 ##### **volume-reference-fsx.yaml**:
 ```
@@ -102,7 +118,7 @@ spec:
   pvcName: shared-pv
   pvcNamespace: vector
 ```
-##### **eks-sample-linux-deployment.yaml**:
+##### **key parts of the eks-sample-linux-deployment.yaml file**:
 ```
       volumes:
         - name: task-pv-storage
@@ -137,6 +153,18 @@ Installing an example application by helm:
 helm upgrade --install example-app ./examples/example-app -n rpc --create-namespace
 ```
 
+To check that it was successfully deployed run:
+```
+kubectl get pods -n rpc
+```
+The output should look similar to this:
+```
+$ kubectl get pod -n rpc
+NAME                                          READY   STATUS    RESTARTS   AGE
+eks-sample-linux-deployment-858b788c8-f5dw2   1/1     Running   0          39s
+eks-sample-linux-deployment-858b788c8-w7zgm   1/1     Running   0          39s
+```
+
 When the application is deployed, you should be able to see the PVC as a mount at /log.
 
 ### Collecting application logs with a logs collector
@@ -146,36 +174,50 @@ Implementing an open-source log collectors to collect logs from the PVC and stre
 #### **vector.dev** 
 A lightweight, ultra-fast tool for building observability pipelines. Check [vector.dev documentation](https://vector.dev/)
 
-Install Vector.dev agent as DeamonSet from [Helm chart](https://vector.dev/docs/setup/installation/package-managers/helm/) and configure :
+Install Vector.dev agent as DaemonSet from [Helm chart](https://vector.dev/docs/setup/installation/package-managers/helm/) and configure :
 1. Clone vector GitHub repository:
 ``` 
 git clone https://github.com/vectordotdev/helm-charts.git
+cd helm-charts/charts/vector
 ```
 
-2. Adding override values:
+2. Create a file to override the default values:
 **vector-override-values.yaml**:
 ```
 role: "Agent"
-existingConfigMaps: 
+
+image:
+  repository: timberio/vector
+  tag: "0.35.0-alpine"
+
+existingConfigMaps:
   - "vector-logs-cm"
+
 dataDir: "/vector-data-dir"
 
-extraVolumeMounts:
-- name: shared-logs
-  mountPath: /logs
-  readOnly: false
-  subPathExpr: $(VECTOR_SELF_NODE_NAME)
-
 service:
-  ports: 
-    - 9090
+  ports:
+    - name: prom-exporter
+      protocol: TCP
+      port: 9090
+      targetPort: 9090
+
+extraVolumeMounts:
+  - name: shared-logs
+    mountPath: /logs
+    readOnly: false
+    subPathExpr: $(VECTOR_SELF_NODE_NAME)
+
+extraVolumes:
+  - name: shared-logs
+    persistentVolumeClaim:
+      claimName: shared-pv
 ``` 
-* `role: "Agent"` - Deploy vector as DeamonSet.
-* `existingConfigMaps` - Adding cutom ConfigMap
-* `extraVolumeMounts` - Mount primary PVC as `/logs/<currnet-node>`, a DeamonSet can only see pods logs on the same host.
+* `role: "Agent"` - Deploy vector as DaemonSet.
+* `existingConfigMaps` - Adding cutom ConfigMap shown below.
+* `extraVolumeMounts` - Mount primary PVC as `/logs/<currnet-node>`, a DaemonSet can only see pods logs on the same host.
 
-
-3. Adding `/examples/logs-collectors/vector/vector-logs-cm.yaml` into Vector stack:
+3. Create a ConfigMap for the Vector stack. This file needs to be put into the `templates` directory of the Vector chart.
 
 ###### **vector-logs-cm.yaml**:
 ```
@@ -187,22 +229,22 @@ metadata:
 
 data:
   stdout.toml: |
-    data_dir = "/vector-data-dir" 
-    api.enabled = true            
-    api.address = "0.0.0.0:8686"       
-    
+    data_dir = "/vector-data-dir"
+    api.enabled = true
+    api.address = "0.0.0.0:8686"
+
     [sources.access_logs]
       type = "file"
       ignore_older_secs = 600
       include = [ "/logs/*/*.log" ]
-      read_from = "beginning"   
+      read_from = "beginning"
 
-    #Send structured data to console                                                                                                                                                                                                                                               
-    [sinks.sink_console]                                                                                                                                                                                                                                                       
-      type = "console"                                                                                                                                                                                                                                                         
-      inputs = ["access_logs"]                                                                                                                                                                                                                                                
-      target = "stdout"                                                                                                                                                                                                                                                        
-      encoding.codec = "text" 
+    #Send structured data to console
+    [sinks.sink_console]
+      type = "console"
+      inputs = ["access_logs"]
+      target = "stdout"
+      encoding.codec = "text"
 ```
 
 In the example above, collecting logs from [source file](https://vector.dev/docs/reference/configuration/sources/file/) as /logs mount and stream it into the console.
@@ -210,20 +252,17 @@ In the example above, collecting logs from [source file](https://vector.dev/docs
 
 4. Install Vector using override values:
 ```
-helm install vector ./ \
-  --namespace vector \
-  --create-namespace \
-  -f agent-override-values.yaml
+helm install vector ./  -n vector -f agent-override-values.yaml
 ```
 
 #### **Filebeat** 
 Lightweight shipper for logs. Check [Filebeat documentation](https://github.com/elastic/helm-charts/tree/main/filebeat)
 
-Install Filebeat as DeamonSet from Helm chart and configure:
+Install Filebeat as DaemonSet from Helm chart and configure:
 1. Clone Filebeat GitHub repository:
 ```
 git clone https://github.com/elastic/helm-charts.git
-cd filebeat
+cd helm-charts/filebeat
 ```
 2. Adding override values:
 **filebeat-overide-values.yaml**:
@@ -265,8 +304,8 @@ data:
 In the example above, collecting logs from [input Log](https://www.elastic.co/guide/en/beats/filebeat/current/filebeat-input-log.html) as `/logs` mount and stream it into the console.
 [See more filebeat output configuration](https://www.elastic.co/guide/en/beats/filebeat/current/configuring-output.html)
 
-4. Adding config map reference to Filebeat DeamonSet:
-**deamonset.yaml:**
+4. Adding config map reference to Filebeat DaemonSet:
+**daemonset.yaml:**
 ```
     - name: filebeat-config
     configMap:
@@ -287,7 +326,7 @@ Fluent Bit is an open-source telemetry agent specifically designed to efficientl
 
 Install fluent-operator from [Helm chart](https://github.com/fluent/helm-charts/tree/main/charts/fluent-operator) and configure:
 
-1. Adding `/examples/logs-collectors/fluent-bit/fluentbit-override-values.yaml` override values:
+1. Adding `examples/logs-collectors/fluent-bit/fluentbit-override-values.yaml` override values:
 **fluentbit-override-values.yaml:**
 ```
 fluentbit:
@@ -297,9 +336,9 @@ fluentbit:
       enable: true
       path: "/logs/*/*.log"
   output:
-      stdout: 
-        enable: true
-      
+    stdout:
+      enable: true
+
   additionalVolumes: 
     - name: shared-logs
       persistentVolumeClaim:
@@ -313,23 +352,27 @@ fluentbit:
 ```
 2. Install fluent-operator using override values:
 ```
-helm upgrade --install fluent-operator --create-namespace -n vector charts/fluent-operator/ -f /examples/logs-collectors/fluent-bit/fluentbit-override-values.yaml
+helm repo add fluent https://fluent.github.io/helm-charts
+helm upgrade --install fluent-operator fluent/fluent-operator -n vector --set containerRuntime=containerd -f fluentbit-override-values.yaml
 ```
 ## Running Tests
 
 To run tests, connect to the sample application and create a log file under /log:
 
 ```bash
-  kubectl exec -it --namespace rpc eks-sample-linux-deployment-858b788c8-57gsz /bin/bash
-  # Run this inside the container:
-  echo "this is my first log" >> /log/access.log
+# Get the pod names.
+kubectl get pods -n rpc
+# Connect to the pod replacing POD_NAME with one of the pods from the output above.
+kubectl exec -it -n rpc POD_NAME -- /bin/bash
+# Run this inside the container:
+echo "this is my first log" >> /log/access.log
 ```
 You should see the log on vector stdout log:
 ```
+$ kubectl logs -n vector daemonset/vector | grep "this is"
 2024-01-21T11:45:31.903153Z  INFO source{component_kind="source" component_id=access_logs component_type=file}:file_server: vector::internal_events::file::source: Found new file to watch. file=/logs/eks-sample-linux-deployment-858b788c8-57gsz/access.log
 this is my first log
 ```
-
 You should see the log on filebeat stdout log:
 ```
 "log": {
@@ -345,6 +388,7 @@ You should see the log on filebeat stdout log:
 ```
 You should see the log on fluent-bit stdout log:
 ```
+$ kubectl logs daemonset/fluent-bit -n vector | grep "this is"
 kube.logs.eks-sample-linux-deployment-858b788c8-mrl6l.access.log: [[1705914980.701605366, {}], {"log"=>"this is my first log"}]
 ```
 ## Author Information
