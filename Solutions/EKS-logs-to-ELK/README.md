@@ -19,7 +19,7 @@ The following section provide quick start instructions for multiple logs shipper
 
 ### Prerequisites
 
-* `helm` - For resource installation. Documenation [here](https://helm.sh/docs/).
+* `helm` - For resource installation. Documentation [here](https://helm.sh/docs/).
 * `kubectl` – For interacting with the EKS cluster. Documentation [here](https://kubernetes.io/docs/reference/kubectl/).
 * An AWS EKS cluster.
 * NetApp FSxN running on the same EKS VPC.
@@ -36,21 +36,28 @@ The following section provide quick start instructions for multiple logs shipper
 
 ### Installation
 
-* Configure Trident CSI backend to connect to the FSxN file system. First step is to configure a secret for Trident to use to communciate with the FSxN file system.
+* Configure Trident CSI backend to connect to the FSxN file system. First step is to configure a secret for Trident to use to communicate with the FSxN file system.
 ```
 kubectl create secret generic fsx-secret --from-literal=username=fsxadmin --from-literal=password=<your FSxN password> -n trident
 ```
-Next, create a backend configuration for Trident to use to connect to the FSxN file system by running the included helm chart.
+Next, create a namespace to hold the shared volume. The sample application assumes the name of this namespace is `vector`.
+If you want to use a different name, you will need to update primary-pvc-fsx.yaml file listed below and the sample application as well.
+```
+kubectl create namespace vector
+```
+Finally, create a backend configuration for Trident to use to connect to the FSxN file system by running the included helm chart.
+This chart also create the shared PVC that will be used by the sample application.
+
 * The custom Helm chart includes:
    - `backend-tbc-ontap-nas.yaml` - backend configuration for using NFS on EKS
    - `backend-fsx-ontap-san.yaml` - backend configuration for using ISCSI on EKS (Optional)
    - `storageclass-fsx-nfs.yaml` - Kubernetes storage class for using NFS 
    - `storageclass-fsx-san.yaml` - Kubernetes storage class for using ISCSI (Optional) 
-   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. **NOTE:** The PVC will be created in the `vector` namespace, so if this namespace does not exist, it should be created before running the helm command below. [Check Trident TridentVolumeReference](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
+   - `primary-pvc-fsx.yaml` - primary PVC that will be shared cross-namespaces. **NOTE:** The PVC will be created in the `vector` namespace. For more information on setting up a shared volume refer to this [Trident Documentation](https://docs.netapp.com/us-en/trident/trident-use/volume-share.html).
 
 The following variables should be filled on the `trident-resources/values.yaml`, or set via the `--set` Helm command line option.
 
-* `namespace` - namespace of the Trident operator. Typically 'trident'.
+* `namespace` - namespace of the Trident operator (not the shared PVC). Typically 'trident'.
 * `fsx.managment_lif` - FSxN management ip address
 * `fsx.svm_name` - FSxN SVM name
 * `fsx.data_lif` - FSxN SVM data ip address
@@ -61,7 +68,7 @@ Then use helm to deploy the package:
 ```
 helm install trident-resources ./trident-resources -n trident
 ```
-:bulb: **NOTE:** If this command fails (e.g. because you hadn't created the `vector` namespace first), it still creates a secret under the 'trident' namespace that must deleted before re-running the command. You might see an "cannot re-use a name that is still in use" error when trying to re-run it. Use `kubectl get secrets -n trident` to get the name of the secret, it will look something like `sh.helm.release.v1.trident-resources.v1` and delete it using `kubectl delete secret <secret-name> -n trident`.
+:bulb: **NOTE:** If this command fails, it still creates a secret under the 'trident' namespace that must deleted before re-running the command. You might see an "cannot re-use a name that is still in use" error when trying to re-run it. Use `kubectl get secrets -n trident` to get the name of the secret, it will look something like `sh.helm.release.v1.trident-resources.v1` and delete it using `kubectl delete secret <secret-name> -n trident`.
 
 Verify that FSxN has been successfully connected to the backend:
 ```
@@ -166,12 +173,12 @@ When the application is deployed, you should be able to see the PVC as a mount a
 
 ### Collecting application logs with a logs collector
 
-There are examples of setting up three different types of log collectors to collect logs from the PVC and stream them to the console. You can read more about each of the log collectors in the following sections.
+Here are examples of setting up three different log collectors to collect logs from the PVC and stream them to the console. You can read more about each of the log collectors in the following sections.
 
 #### **vector.dev** 
-A lightweight, ultra-fast tool for building observability pipelines. Check [vector.dev documentation](https://vector.dev/)
+A lightweight, ultra-fast tool for building observability pipelines. For more information check [vector.dev documentation](https://vector.dev/)
 
-Install Vector.dev agent as DaemonSet from [Helm chart](https://vector.dev/docs/setup/installation/package-managers/helm/) and configure :
+Install Vector.dev agent as DaemonSet from [Helm chart](https://vector.dev/docs/setup/installation/package-managers/helm/) and configure:
 1. Clone vector GitHub repository:
 ``` 
 git clone https://github.com/vectordotdev/helm-charts.git
@@ -213,7 +220,7 @@ extraVolumes:
 * `existingConfigMaps` - Adding cutom ConfigMap shown below.
 * `extraVolumeMounts` - Mount primary PVC as `/logs/<currnet-node>`, a DaemonSet can only see pods logs on the same host.
 
-3. Create a ConfigMap file (**vector-logs-cm.yaml**) for the Vector stack. This file needs to be put into the `templates` directory.
+3. Create a ConfigMap file (**vector-logs-cm.yaml**) for the Vector stack. This file **must** to be put into the `templates` directory.
 ```
 apiVersion: v1
 kind: ConfigMap
