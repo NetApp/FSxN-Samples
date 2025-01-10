@@ -109,8 +109,6 @@ the following is an example of last part of the output of a successful deploymen
 ```bash
 Outputs:
 
-Outputs:
-
 eks-cluster-name = "eksfs-eks-lutuycvJ"
 eks-jump-server = "Instance ID: i-00de97f46e3c9a617, Public IP: 54.213.93.236"
 fsx-id = "fs-04f1b48f8da639a7f"
