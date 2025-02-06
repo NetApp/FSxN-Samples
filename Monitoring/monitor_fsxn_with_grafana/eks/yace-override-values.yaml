@@ -1,0 +1,37 @@
+serviceAccount:
+  create: false
+  name: "yace-exporter-sa"
+
+aws:
+  role: yace-cloudwatch-exporter-role
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: <Promethues_Name>
+
+config: |-
+  apiVersion: v1alpha1
+  sts-region: ap-northeast-2
+  discovery:
+    jobs:
+    - type: AWS/FSx
+      regions:
+        - ap-northeast-2
+      period: 300
+      length: 300
+      metrics:
+      - name: DiskReadOperations
+        statistics: [Average]
+      - name: DiskWriteOperations
+        statistics: [Average]
+      - name: DiskReadBytes
+        statistics: [Average]
+      - name: DiskWriteBytes
+        statistics: [Average]
+      - name: DiskIopsUtilization
+        statistics: [Average]
+      - name: NetworkThroughputUtilization
+        statistics: [Average]
+      - name: FileServerDiskThroughputUtilization
+        statistics: [Average]

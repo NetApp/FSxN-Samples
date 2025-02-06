@@ -1,0 +1,35 @@
+# Default values for Trident-insallation-chart.
+# This is a YAML-formatted file.
+
+global:
+  imageRegistry: ghcr.io/tlvdevops/harvest-fsx:latest
+  imageName: harvest-fsx
+  tag: ""
+  replicaCount: 1
+
+resources:
+  limits:
+    cpu: "200m"
+    memory: "1536Mi"
+  requests:
+    cpu: "200m"
+    memory: "1536Mi"
+
+promethues: 
+
+fsxs:
+  clusters:
+  - name: fsxtest01
+    managment_lif: 
+    promPort: 12990
+    secretName: 
+    region: 
+  - name: fsxtest02
+    managment_lif: 
+    promPort: 12990
+    secretName: 
+    region: 
+
+
+
+

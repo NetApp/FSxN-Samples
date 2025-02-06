@@ -1,0 +1,48 @@
+services:
+  fsx01:
+    image: ghcr.io/tlvdevops/harvest-fsx:latest
+    container_name: poller-fsx01
+    restart: unless-stopped
+    ports:
+      - "12990:12990"
+    command: '--poller fsx01 --promPort 12990 --config /opt/harvest.yml'
+    volumes:
+      - ./cert:/opt/harvest/cert
+      - ./harvest.yml:/opt/harvest.yml
+      - ./conf:/opt/harvest/conf
+    environment:
+      - SECRET_NAME=iscsifsx
+      - AWS_REGION=us-west-2
+    networks:
+      - backend
+  fsx02:
+    image: ghcr.io/tlvdevops/harvest-fsx:latest
+    container_name: poller-fsx02
+    restart: unless-stopped
+    ports:
+      - "12991:12991"
+    command: '--poller fsx02 --promPort 12991 --config /opt/harvest.yml'
+    volumes:
+      - ./cert:/opt/harvest/cert
+      - ./harvest.yml:/opt/harvest.yml
+      - ./conf:/opt/harvest/conf
+    environment:
+      - SECRET_NAME=<your_secret_2>
+      - AWS_REGION=<your_region>
+    networks:
+      - backend
+  yace:
+    image: quay.io/prometheuscommunity/yet-another-cloudwatch-exporter:latest
+    container_name: yace
+    restart: always
+    expose:
+      - 8080
+    volumes:
+      - ./yace-config.yaml:/tmp/config.yml
+      - $HOME/.aws:/exporter/.aws:ro
+    command:
+      - -listen-address=:8080
+      - -config.file=/tmp/config.yml
+    networks:
+      - backend
+

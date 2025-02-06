@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 1m
+  scrape_timeout: 10s
+  evaluation_interval: 1m
+  external_labels:
+    monitor: 'harvest'
+rule_files:
+  - 'alert_rules.yml'
+  - 'ems_alert_rules.yml'
+
+scrape_configs:
+- job_name: 'prometheus'
+  static_configs:
+  - targets: ['localhost:9090']
+- job_name: 'harvest'
+  file_sd_configs:
+    - files:
+      - 'harvest_targets*.yml'
+- job_name: yace
+  static_configs:
+    - targets:
+        - ['yace:8080']
