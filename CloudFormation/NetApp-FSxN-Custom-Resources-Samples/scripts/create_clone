@@ -12,7 +12,7 @@ cat <<EOF
 Usage: $(basename $0) [-r region] -l link_arn -s secret_arn [-k secretKey] -f fsx_id -v svm_name -p parent_volume_name [-c clone_volume_name] -t templete_filename
 Notes:
     The default region is whatever the default region is for the AWS CLI.
-    The default secretKey is 'password'.
+    The default secretKey is 'credentials'.
     The clone_volume_name defaults to the parent_volume_name with '_clone' appended.
 EOF
 }
@@ -20,7 +20,7 @@ EOF
 # Set the default values.
 linkArn=""
 secretArn=""
-secretKey="password"
+secretKey="credentials"
 fsxId=""
 svmName=""
 parentVolumeName=""

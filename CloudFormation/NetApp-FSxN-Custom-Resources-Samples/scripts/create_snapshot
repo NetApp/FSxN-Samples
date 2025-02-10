@@ -13,14 +13,14 @@ cat <<EOF
 Usage: $(basename $0) [-r region] -l link_ARN -s secret_ARN [-k secret_key] -f fsx_id -v svm_name -n volume_name -p snapshot_name -t templete_filename
 Notes:
   The default region is the region configured in the AWS CLI.
-  The default secret key is 'password'.
+  The default secret key is 'credentials'.
 EOF
 }
 #
 # Set the default values.
 linkArn=""
 secretArn=""
-secretKey="password"
+secretKey="credentials"
 fsxId=""
 svmName=""
 volumeName=""

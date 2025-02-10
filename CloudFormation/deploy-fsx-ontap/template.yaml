@@ -13,6 +13,9 @@ Metadata:
           - ThroughputCapacity
           - PrimarySubnet
           - SecurityGroupIds
+          - BackupRetentionDays
+          - DailyAutomaticBackupStartTime
+          - WeeklyMaintenanceStartTime
       - Label:
           default: "Scale Out Only Parameters"
         Parameters:
@@ -59,6 +62,21 @@ Parameters:
   PrimarySubnet:
     Description: "The primary subnet."
     Type: "AWS::EC2::Subnet::Id"
+
+  BackupRetentionDays:
+    Description: "The number of days to retain backups for. The default is 30. If set to 0, backups are disabled."
+    Type: Number
+    Default: 30
+
+  DailyAutomaticBackupStartTime:
+    Description: "The preferred time, in UTC, to take daily automatic backups. The default is 00:00."
+    Type: String
+    Default: "00:00"
+
+  WeeklyMaintenanceStartTime:
+    Description: "The preferred time, in UTC, to perform weekly maintenance. The format d:hh:mm where Monday = 1 and Sunday = 7. The default is 7:00:00."
+    Type: String
+    Default: "7:00:00"
   #
   # Unfortunately, has to be set to type String since it is an optional parameter.
   SecondarySubnet:
@@ -97,6 +115,9 @@ Resources:
       SubnetIds: [!Ref PrimarySubnet, !If [ MultiAZ, !Ref SecondarySubnet, !Ref "AWS::NoValue" ]]
       SecurityGroupIds: !Ref SecurityGroupIds
       OntapConfiguration:
+        AutomaticBackupRetentionDays: !Ref BackupRetentionDays
+        DailyAutomaticBackupStartTime: !Ref DailyAutomaticBackupStartTime
+        WeeklyMaintenanceStartTime: !Ref WeeklyMaintenanceStartTime
         DeploymentType: !Ref DeploymentType
         ThroughputCapacityPerHAPair: !Ref ThroughputCapacity
         HAPairs: !If [ ScaleOut, !Ref HAPairs, 1 ]

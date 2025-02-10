@@ -16,6 +16,24 @@ There are also a couple scripts that can be used to help enable the NetApp FSxN 
 |deploy_link | This script will use CloudFormation to deploy a Workload Factory Link.|
 |createClone.py | This is a Python script that will create a clone of a volume using boto to deploy a CloudFormation stack that creates a clone.|
 
+## Usage
+To run these scripts you'll need to download them, change the permissions to be executable, and then run them. For example:
+```bash
+chmod +x create_volume
+./create_volme -r us-west-2 -l arn:aws:lambda:ca-central-1:759999999999:function:wf-link -s arn:aws:secretsmanager:us-east-1:759999999999:secret:fsnSecret-yyaL32 -f fs-02a89999999999999 -v prod -n vol1 -t ../create_volume.yaml
+```
+
+To see the required parameters for each script, you can run the script with the `-h` flag. For example:
+```bash
+./create_volume -h
+Usage: create_volume [-r region] -l link_ARN -s secret_ARN [-k secret_key] -f fsx_id -v svm_name -n volune_name [-z size_in_MB] [-a aggregate] -t template
+Notes:
+  The default region is the region configured in the AWS CLI.
+  The default secret key is 'credentials'.
+  The default aggregate is "aggr1".
+  The default size is 20MB.
+```
+
 ## Author Information
 
 This repository is maintained by the contributors listed on [GitHub](https://github.com/NetApp/FSx-ONTAP-samples-scripts/graphs/contributors).

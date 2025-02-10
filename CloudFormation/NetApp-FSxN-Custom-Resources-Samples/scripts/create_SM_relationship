@@ -12,12 +12,12 @@
 ################################################################################
 usage () {
 cat <<EOF
-Usage: $(basename $0) [--region region] --source-link-arn link_arn --source-secret-arn secret_arn [--source-secret-key password] --source-fsx fsx_id --source-svm svm_name  --source-vol vol_name \\
-                                          --dest-link-arn link_arn   --dest-secret-arn secret_arn   [--dest-sceret-key password]   --dest-fsx fsx_id   --dest-svm svm_name [--dest-vol vol_name_dp] \\
+Usage: $(basename $0) [--region region] --source-link-arn link_arn --source-secret-arn secret_arn [--source-secret-key key] --source-fsx fsx_id --source-svm svm_name  --source-vol vol_name \\
+                                          --dest-link-arn link_arn   --dest-secret-arn secret_arn   [--dest-sceret-key key]   --dest-fsx fsx_id   --dest-svm svm_name [--dest-vol vol_name_dp] \\
                                --template templete_filename [--dest-aggr aggregate1]
 Notes:
   The default region is whatever the default region is in the AWS CLI configuration.
-  The default secret key is 'password'.
+  The default secret key is 'credentials'.
   The default destination volume name is the source volume name with '_dp' appended.
   The default aggregate is 'aggr1'.
 EOF
@@ -26,13 +26,13 @@ EOF
 # Instead of passing a bunch of parameters, set the values of the variables here.
 sourceLinkArn=""
 sourceSecretArn=""
-sourceSecretKey="password"
+sourceSecretKey="credentials"
 sourceFsxId=""
 sourceSvmName=""
 sourceVolumeName=""
 destinationLinkArn=""
 destinationSecretArn=""
-destinationSecretKey="password"
+destinationSecretKey="credentials"
 destinationFsxId=""
 destinationSvmName=""
 destinationAggregate="aggr1"

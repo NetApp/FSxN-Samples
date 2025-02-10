@@ -11,17 +11,18 @@
 ################################################################################
 usage () {
 cat <<EOF
-Usage: $(basename $0) [-r region] -l link_ARN -s secret_ARN -k secret_key -f fsx_id -v svm_name -n policy_name [-p protocols] -c match_CIDR -t templete_filename
+Usage: $(basename $0) [-r region] -l link_ARN -s secret_ARN [-k secret_key] -f fsx_id -v svm_name -n policy_name [-p protocols] -c match_CIDR -t templete_filename
 Notes:
     The default region is whatever the default region is set in the AWS CLI.
     The default protocols is "any"
+    The default secret_key is "credentials"
 EOF
 }
 #
 # Set the default values.
 linkArn=""
 secretArn=""
-secretKey="password"
+secretKey="credentials"
 fsxId=""
 svmName=""
 policyName=""
