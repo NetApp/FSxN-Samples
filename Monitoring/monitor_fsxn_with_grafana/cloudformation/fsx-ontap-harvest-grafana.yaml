@@ -1,0 +1,300 @@
+  AWSTemplateFormatVersion: 2010-09-09
+
+  Description: Creates the Harvest and Grafana environment to monitor your Amazon FSx for Netapp ONTAP resources.
+
+  Metadata:
+    Authors:
+      Description: Adi Zalmanovich (adiz@netapp.com)
+    AWS::CloudFormation::Interface:
+      ParameterGroups:
+      - Label:
+          default: Harvest and Grafana Instance parameters
+        Parameters:
+          - InstanceType
+          - KeyPair
+          - SecurityGroup
+          - SubnetType
+          - Subnet
+      - Label:
+          default: Amazon FSx for Netapp ONTAP file system parameters
+        Parameters:
+          - FSxEndPoint
+          - SecretName
+      ParameterLabels:
+        InstanceType:
+          default: Instance Type
+        KeyPair:
+          default: Key Pair
+        LatestLinuxAmiId:
+          default: Latest Amazon Linux AMI ID
+        SecurityGroup:
+          default: Security group ID
+        SubnetType:
+          default: Subnet Type
+        Subnet:
+          default: Subnet ID
+        FSxEndPoint:
+          default: Management endpoint IP address
+        SecretName:
+          default: AWS Secrets Manager Secret Name
+
+  Parameters:
+    InstanceType:
+      Description: Select the instance type. Recommended config for every 10 file system's (CPU - 2 cores, Memory - 1GB, Disk - 500MB)
+      AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t3.large
+      - t3.xlarge
+      - t3.2xlarge
+      - m5.large
+      - m5.xlarge
+      - m5.2xlarge
+      - m5.4xlarge
+      - m5n.large
+      - m5n.xlarge
+      - m5n.2xlarge
+      - m5n.4xlarge
+      - c5.large
+      - c5.xlarge
+      - c5.2xlarge
+      - c5.4xlarge
+      - c5.9xlarge
+      - c5.12xlarge
+      - c5.18xlarge
+      - c5n.xlarge
+      - c5n.2xlarge
+      - c5n.4xlarge
+      - r5n.large
+      - r5n.xlarge
+      - r5n.2xlarge
+      - r5n.4xlarge
+      Default: t3.micro
+      Type: String
+    KeyPair:
+      Type: AWS::EC2::KeyPair::KeyName
+    SecurityGroup:
+      Description: Security group ID for the Harvest/Grafana Instance. Ensure Inbound ports 3000 and 9090 are open.
+      Type: List<AWS::EC2::SecurityGroup::Id>
+    SubnetType:
+      Description: Choose between public or private subnet based on the preferred subnet of your Amazon FSx for NetApp ONTAP file system.
+      Type: String
+      AllowedValues:
+      - public
+      - private
+    Subnet:
+      Type: AWS::EC2::Subnet::Id
+      Description: Subnet ID. Specify the same subnet as your Amazon FSx for NetApp ONTAP file system's preferred subnet.
+    LatestLinuxAmiId:
+      Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+      Default: '/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2'
+    FSxEndPoint:
+      Description: File system management endpoint IP address
+      Type: String
+    SecretName:
+      Description: 'AWS Secrets Manager Secret Name containing password for the file system "fsxadmin user". Validate secret is stored in format {"USERNAME" : "fsxadmin", "PASSWORD" : "<your password>"}'
+      Type: String
+
+  Conditions:
+    CreatePublicIP: !Equals [!Ref SubnetType, public]
+    CreatePrivateIP: !Equals [!Ref SubnetType, private]
+
+  Resources:
+    Instance:
+      Type: AWS::EC2::Instance
+      Properties:
+        IamInstanceProfile: !Ref MyInstanceProfile
+        ImageId: !Ref LatestLinuxAmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyPair
+        Monitoring: true
+        NetworkInterfaces:
+          - AssociatePublicIpAddress: !If [CreatePublicIP, "true", "false"]
+            DeviceIndex: "0"
+            SubnetId: !Ref Subnet
+            GroupSet: !Ref SecurityGroup
+        Tags:
+          - Key: Name
+            Value: Harvest/Grafana Instance for Amazon FSx for NetApp ONTAP
+        UserData:
+          'Fn::Base64': !Sub |
+            #!/bin/bash
+            # Install Docker
+            yum install -y docker
+            systemctl start docker
+            systemctl enable docker
+
+            # Download and install Docker Compose plugin
+            curl -L https://download.docker.com/linux/centos/7/x86_64/stable/Packages/docker-compose-plugin-2.6.0-3.el7.x86_64.rpm -o /home/ec2-user/compose-plugin.rpm
+            yum install /home/ec2-user/compose-plugin.rpm -y
+
+            mkdir -p /opt/harvest
+            cd /opt/harvest
+            # Create harvest.yml
+            cat <<EOF > harvest.yml
+            Exporters:
+              prometheus1:
+                exporter: Prometheus
+                port_range: 12990-14000
+                add_meta_tags: false
+            Defaults:
+              use_insecure_tls: true
+            Pollers:
+              fsx01:
+                datacenter: fsx
+                addr: ${FSxEndPoint}
+                collectors:
+                  - Rest
+                  - RestPerf
+                  - Ems
+                exporters:
+                  - prometheus1
+                credentials_script:
+                  path: /opt/fetch-credentails
+                  schedule: 3h
+                  timeout: 10s
+            EOF
+
+            # Generate Docker Compose file for Harvest
+            docker run --rm \
+              --env UID=$(id -u) --env GID=$(id -g) \
+              --entrypoint "bin/harvest" \
+              --volume "$(pwd):/opt/temp" \
+              --volume "$(pwd)/harvest.yml:/opt/harvest/harvest.yml" \
+              ghcr.io/netapp/harvest \
+              generate docker full \
+              --output harvest-compose.yml
+
+            # Add environment variables to Docker Compose file
+            awk "/networks:/{print \"    environment:\\n      - SECRET_NAME=${SecretName}\\n      - AWS_REGION=${AWS::Region}\"}1" harvest-compose.yml > temp && mv temp harvest-compose.yml
+
+            # Replace image in Docker Compose file
+            sed -i 's|ghcr.io/netapp/harvest:latest|ghcr.io/tlvdevops/harvest-fsx:latest|g' harvest-compose.yml
+
+            # Download grafana dashbaords
+            wget https://raw.githubusercontent.com/TLVDevOps/harvest-fsx/main/dashboards.zip
+            unzip dashboards.zip
+            rm -rf grafana/dashboards && mv dashboards grafana/dashboards
+
+            # Create yace-config.yaml
+            cat <<EOF > yace-config.yaml
+            apiVersion: v1alpha1
+            sts-region: ${AWS::Region}
+            discovery:
+              jobs:
+                - type: AWS/FSx
+                  regions: [${AWS::Region}]
+                  period: 300
+                  length: 300
+                  metrics:
+                    - name: DiskReadOperations
+                      statistics: [Average]
+                    - name: DiskWriteOperations
+                      statistics: [Average]
+                    - name: DiskReadBytes
+                      statistics: [Average]
+                    - name: DiskWriteBytes
+                      statistics: [Average]
+                    - name: DiskIopsUtilization
+                      statistics: [Average]
+                    - name: NetworkThroughputUtilization
+                      statistics: [Average]
+                    - name: FileServerDiskThroughputUtilization
+                      statistics: [Average]
+            EOF
+
+            # Append YACE service to Docker Compose file
+            cat <<__EOF__ >> harvest-compose.yml
+              yace:
+                image: quay.io/prometheuscommunity/yet-another-cloudwatch-exporter:latest
+                container_name: yace
+                restart: always
+                expose:
+                  - 8080
+                volumes:
+                  - ./yace-config.yaml:/tmp/config.yml
+                  - \$HOME/.aws:/exporter/.aws:ro
+                command:
+                  - -listen-address=:8080
+                  - -config.file=/tmp/config.yml
+                networks:
+                  - backend
+            __EOF__
+
+            # Append YACE job to Prometheus configuration
+            cat <<EOF >> container/prometheus/prometheus.yml
+            - job_name: 'yace'
+              static_configs:
+                - targets: ['yace:8080']
+            EOF
+
+            # Start Docker Compose services
+            docker compose -f prom-stack.yml -f harvest-compose.yml up -d --remove-orphans
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Instance --region ${AWS::Region}
+      CreationPolicy: 
+        ResourceSignal:
+          Timeout: PT15M
+
+    MyInstanceProfile:
+      Type: 'AWS::IAM::InstanceProfile'
+      Properties:
+        Path: '/'
+        Roles:
+          - Ref: MyIAMRole
+
+    MyIAMRole:
+      Type: 'AWS::IAM::Role'
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service:
+                  - 'ec2.amazonaws.com'
+              Action:
+                - 'sts:AssumeRole'
+        Path: '/'
+        Policies:
+          - PolicyName: MyIAMRolePolicy
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - 'secretsmanager:GetSecretValue'
+                    - 'secretsmanager:DescribeSecret'
+                    - 'secretsmanager:ListSecrets'
+                  Resource:
+                    - !Sub 'arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:${SecretName}-*'
+                - Sid: 'Statement1'
+                  Effect: Allow
+                  Action:
+                    - 'tag:GetResources'
+                    - 'cloudwatch:GetMetricData'
+                    - 'cloudwatch:GetMetricStatistics'
+                    - 'cloudwatch:ListMetrics'
+                    - 'apigateway:GET'
+                    - 'aps:ListWorkspaces'
+                    - 'autoscaling:DescribeAutoScalingGroups'
+                    - 'dms:DescribeReplicationInstances'
+                    - 'dms:DescribeReplicationTasks'
+                    - 'ec2:DescribeTransitGatewayAttachments'
+                    - 'ec2:DescribeSpotFleetRequests'
+                    - 'shield:ListProtections'
+                    - 'storagegateway:ListGateways'
+                    - 'storagegateway:ListTagsForResource'
+                    - 'iam:ListAccountAliases'
+                  Resource:
+                    - '*'
+
+  Outputs:
+      PublicURL:
+          Condition: CreatePublicIP
+          Description: Use below Public IP URL to connect to the Grafana endpoint
+          Value: !Join [ "", ["http://",!GetAtt Instance.PublicIp,":3000" ]]
+      PrivateURL:
+          Condition: CreatePrivateIP
+          Description: Use below Private IP URL to connect to the Grafana endpoint
+          Value: !Join [ "", ["http://",!GetAtt Instance.PrivateIp,":3000" ]]

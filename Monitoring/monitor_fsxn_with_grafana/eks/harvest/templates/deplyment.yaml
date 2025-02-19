@@ -1,0 +1,49 @@
+{{- range .Values.fsxs.clusters }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}-poller-deployment
+  namespace: {{ $.Release.Namespace }}
+spec:
+  replicas: {{ $.Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: harvest-poller-{{ .name }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: harvest-poller-{{ .name }}
+    spec:
+      serviceAccountName: harvest-sa
+      containers:
+        - args:
+            - --poller
+            - {{ .name }}
+            - --promPort
+            - {{ .promPort | quote}}
+            - --config
+            - /opt/harvest.yml
+          image: ghcr.io/tlvdevops/harvest-fsx:latest
+          name: poller-fsx
+          ports:
+            - containerPort: {{ .promPort }}
+          resources: {}
+          volumeMounts:
+            - mountPath: /opt/harvest.yml
+              name: harvest-config
+              subPath: harvest.yml
+          envFrom:
+          - configMapRef:
+              name: harvest-credentials-config-{{ .name }}
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            items:
+              - key: harvest.yml
+                path: harvest.yml
+            name: harvest-config-{{ .name }}
+          name: harvest-config
+---
+{{ end }}

@@ -1,0 +1,41 @@
+{
+  "Statement": [
+    {
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret",
+        "secretsmanager:ListSecrets"
+      ],
+      "Effect": "Allow",
+      "Resource": [
+        "<your_secret_1>",
+        "<your_secret_2>"
+      ]
+    },
+    {
+      "Sid": "Statement1",
+      "Effect": "Allow",
+      "Action": [
+        "tag:GetResources",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "apigateway:GET",
+        "aps:ListWorkspaces",
+        "autoscaling:DescribeAutoScalingGroups",
+        "dms:DescribeReplicationInstances",
+        "dms:DescribeReplicationTasks",
+        "ec2:DescribeTransitGatewayAttachments",
+        "ec2:DescribeSpotFleetRequests",
+        "shield:ListProtections",
+        "storagegateway:ListGateways",
+        "storagegateway:ListTagsForResource",
+        "iam:ListAccountAliases"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ],
+  "Version": "2012-10-17"
+}
