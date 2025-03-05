@@ -1,0 +1,34 @@
+Exporters:
+    prometheus1:
+        exporter: Prometheus
+        port_range: 12990-14000
+        add_meta_tags: false
+Defaults:
+    use_insecure_tls: true
+Pollers:
+    fsx01:
+        datacenter: fsx
+        addr: <FSxN_ip_1>
+        collectors:
+            - Rest
+            - RestPerf
+            - Ems
+        exporters:
+            - prometheus1
+        credentials_script:
+            path: /opt/fetch-credentails
+            schedule: 3h
+            timeout: 10s
+    fsx02:
+        datacenter: fsx
+        addr: <FSxN_ip_2>
+        collectors:
+            - Rest
+            - RestPerf
+            - Ems
+        exporters:
+            - prometheus1
+        credentials_script:
+            path: /opt/fetch-credentails
+            schedule: 3h
+            timeout: 10s

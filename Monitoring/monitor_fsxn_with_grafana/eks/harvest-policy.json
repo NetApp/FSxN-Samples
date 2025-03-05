@@ -1,0 +1,16 @@
+{
+    "Statement": [
+        {
+            "Action": [
+                "secretsmanager:GetSecretValue",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:ListSecrets"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "$SECRET"
+            ]
+        }
+    ],
+    "Version": "2012-10-17"
+}

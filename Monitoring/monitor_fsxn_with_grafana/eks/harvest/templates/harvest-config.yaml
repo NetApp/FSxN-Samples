@@ -1,0 +1,35 @@
+{{- range .Values.fsxs.clusters }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    app: harvest-poller-{{ .name }}
+  name: harvest-config-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+data:
+  harvest.yml: |+
+    Tools:
+    Exporters:
+        prometheus1:
+            exporter: Prometheus
+            port_range: 12990-14000
+            add_meta_tags: false
+    Defaults:
+        use_insecure_tls: true
+    Pollers:
+      {{ .name }}:
+            datacenter: fsx
+            addr: {{ .managment_lif }}
+            collectors:
+                - Rest
+                - RestPerf
+                - Ems
+            exporters:
+                - prometheus1
+            credentials_script:
+              path: /opt/fetch-credentails
+              schedule: 3h
+              timeout: 10s
+---
+{{ end }}
+

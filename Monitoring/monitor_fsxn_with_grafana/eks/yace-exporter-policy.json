@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "tag:GetResources",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics",
+        "apigateway:GET",
+        "aps:ListWorkspaces",
+        "autoscaling:DescribeAutoScalingGroups",
+        "dms:DescribeReplicationInstances",
+        "dms:DescribeReplicationTasks",
+        "ec2:DescribeTransitGatewayAttachments",
+        "ec2:DescribeSpotFleetRequests",
+        "shield:ListProtections",
+        "storagegateway:ListGateways",
+        "storagegateway:ListTagsForResource",
+        "iam:ListAccountAliases"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
